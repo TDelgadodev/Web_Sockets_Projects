@@ -10,41 +10,53 @@
     import { io } from "https://cdn.socket.io/4.3.2/socket.io.esm.min.js";
 
     const getUsername = async () => {
-      const username = localStorage.getItem('username');
-      if(username){
+      const username = localStorage.getItem("username");
+      if (username) {
         console.log(`User existed ${username}`);
         return username;
       }
 
-      const res = await fetch('https://random-data-api.com/api/users/random_user')
-      const { username: randomUsername } = await res.json()
+      const res = await fetch(
+        "https://random-data-api.com/api/users/random_user"
+      );
+      const { username: randomUsername } = await res.json();
 
-      localStorage.setItem('username', randomUsername);
-      return randomUsername
-    }
-
+      localStorage.setItem("username", randomUsername);
+      return randomUsername;
+    };
 
     const socket = io({
-      auth : {
+      auth: {
         username: await getUsername(),
-        serverOffset: 0
-      }
+        serverOffset: 0,
+      },
     });
 
-    const form = document.getElementById('form');
-    const input = document.getElementById('input');
-    const messages = document.getElementById('messages');
-    
-    socket.on("chat message", (msg, serverOffset, username) => {
-      const item = `
-      <li>
-        <small>${username}</small>
-        <p>${msg}</p>
-      </li>`;
-      messages.insertAdjacentHTML("beforeend", item);
-      socket.auth.serverOffset = serverOffset
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const messages = document.getElementById("messages");
 
-      messages.scrollTop = messages.scrollHeight
+    socket.on("chat message", (msg, serverOffset, username) => {
+      const options = {
+        hour: "numeric",
+        minute: "numeric",
+        hour12: false,
+        timeZone: "America/Argentina/Buenos_Aires",
+      };
+
+      const timestamp = new Date().toLocaleTimeString("es-AR", options);
+
+      const item = `
+    <li>
+      <small>${username}</small>
+      <p>${msg}</p>
+      <small class="timestamp">${timestamp}</small>
+    </li>`;
+
+      messages.insertAdjacentHTML("beforeend", item);
+      socket.auth.serverOffset = serverOffset;
+
+      messages.scrollTop = messages.scrollHeight;
     });
 
     form.addEventListener("submit", (e) => {
@@ -55,6 +67,67 @@
         input.value = "";
       }
     });
+
+    let deletedMessages = [];
+    const clearChatButton = document.getElementById("clearChat");
+
+    clearChatButton.addEventListener("click", () => {
+      deletedMessages = [...messages.children];
+      messages.innerHTML = "";
+      showNotification();
+      document.getElementById("undoDelete").style.display = "inline-block";
+    });
+
+    const notification = document.getElementById("notification");
+    const undoDeleteButton = document.getElementById("undoDelete");
+    const countdownSpan = document.getElementById("countdown");
+
+    let countdownTimer;
+
+    undoDeleteButton.addEventListener("click", () => {
+      deletedMessages.forEach((message) => {
+        messages.appendChild(message);
+      });
+
+      hideNotification();
+      clearTimeout(countdownTimer);
+      document.getElementById("undoDelete").style.display = "none";
+      showRestoredNotification();
+    });
+
+    function showNotification() {
+      notification.style.display = "block";
+      countdownSpan.textContent = "5";
+      countdown();
+    }
+
+    function hideNotification() {
+      notification.style.display = "none";
+    }
+
+    function countdown() {
+      let seconds = parseInt(countdownSpan.textContent, 10);
+      countdownTimer = setInterval(() => {
+        seconds -= 1;
+        countdownSpan.textContent = seconds;
+
+        if (seconds <= 0) {
+          hideNotification();
+          clearTimeout(countdownTimer);
+          showRestoredNotification();
+        }
+      }, 1000);
+    }
+
+    function showRestoredNotification() {
+      const restoredNotification = document.getElementById(
+        "restoredNotification"
+      );
+      restoredNotification.style.display = "block";
+      setTimeout(() => {
+        restoredNotification.style.display = "none";
+      }, 3000);
+    }
   </script>
   <style>
     *,
@@ -91,6 +164,16 @@
 
     #messages > li {
       padding: 0.5rem 1rem;
+      position: relative;
+    }
+
+    .timestamp {
+      position: absolute;
+      padding-right: 10px;
+      bottom: 0;
+      right: 0;
+      font-size: 0.8rem;
+      color: #888;
     }
 
     #messages > li:nth-child(odd) {
@@ -139,9 +222,60 @@
     #form > button:hover {
       background: #0cf;
     }
+
+    #notification {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #f00; /* Color de fondo rojo, puedes cambiarlo según tus preferencias */
+      color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
+
+    #undoDelete {
+      background: #fff;
+      color: #f00;
+      border: 1px solid #f00;
+      padding: 5px 10px;
+      margin: 0 10px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    #undoDelete:hover {
+      background: #f00;
+      color: #fff;
+    }
+
+    #restoredNotification {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #0f0;
+      color: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+      text-align: center;
+    }
   </style>
   <body>
     <section id="chat">
+      <div id="notification">
+        <p>Los mensajes han sido eliminados</p>
+        <button id="undoDelete">Deshacer</button>
+        <span id="countdown"></span>
+      </div>
+      <div id="restoredNotification">
+        <p>Mensajes restaurados con éxito</p>
+      </div>
       <ul id="messages"></ul>
       <form id="form">
         <input
@@ -152,6 +286,7 @@
           autocomplete="off"
         />
         <button type="submit">Enviar</button>
+        <button type="button" id="clearChat">Limpiar Chat</button>
       </form>
     </section>
   </body>

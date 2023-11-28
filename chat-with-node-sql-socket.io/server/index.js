@@ -4,9 +4,14 @@ import dotenv from "dotenv";
 import { createClient } from "@libsql/client";
 import { Server } from "socket.io";
 import { createServer } from "node:http";
+import { fileURLToPath } from 'url'; 
+import path from "path"; 
+
 
 dotenv.config();
 const port = process.env.PORT || 3000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = createServer(app);
@@ -26,6 +31,9 @@ await db.execute(`
     user TEXT
   );
 `);
+
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 io.on("connection", async (socket) => {
   console.log("A user has connected!");
@@ -74,7 +82,7 @@ io.on("connection", async (socket) => {
 app.use(logger("dev"));
 
 app.get("/", (req, res) => {
-  res.sendFile(process.cwd() + "/client/index.html");
+  res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 
 server.listen(port, () => {
